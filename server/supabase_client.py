@@ -41,7 +41,7 @@ class SupabaseClient:
                 if hasattr(st, 'secrets'):
                     try:
                         supabase_url = st.secrets["SUPABASE_URL"]
-                        supabase_key = st.secrets["SUPABASE_KEY"]
+                        supabase_key = st.secrets["SUPABASE_ANON_KEY"]
                     except (KeyError, AttributeError):
                         # Secrets not available, fall back to environment variables
                         pass
@@ -50,7 +50,7 @@ class SupabaseClient:
                 if not supabase_url:
                     supabase_url = os.getenv("SUPABASE_URL")
                 if not supabase_key:
-                    supabase_key = os.getenv("SUPABASE_KEY")
+                    supabase_key = os.getenv("SUPABASE_ANON_KEY")
                     
             except Exception:
                 # Handle case where secrets.toml doesn't exist or is malformed
@@ -61,7 +61,7 @@ class SupabaseClient:
                     "Supabase credentials not found. Please:\n"
                     "1. Copy .streamlit/secrets.toml.template to .streamlit/secrets.toml\n"
                     "2. Add your Supabase URL and KEY to the secrets file\n"
-                    "3. Or set SUPABASE_URL and SUPABASE_KEY environment variables\n\n"
+                    "3. Or set SUPABASE_URL and SUPABASE_ANON_KEY environment variables\n\n"
                     "Get your credentials from: https://supabase.com/dashboard/project/[your-project]/settings/api"
                 )
             
