@@ -32,13 +32,26 @@ class SupabaseClient:
             ValueError: If Supabase credentials are not found
         """
         if cls._instance is None:
-            # Try to get credentials from environment variables first, then Streamlit secrets
+            # Try to get credentials from Streamlit secrets first, then environment variables
             supabase_url = None
             supabase_key = None
             
             try:
-                supabase_url = os.getenv("SUPABASE_URL") or st.secrets.get("SUPABASE_URL")
-                supabase_key = os.getenv("SUPABASE_KEY") or st.secrets.get("SUPABASE_KEY")
+                # Check if we're in a Streamlit context and secrets are available
+                if hasattr(st, 'secrets'):
+                    try:
+                        supabase_url = st.secrets["SUPABASE_URL"]
+                        supabase_key = st.secrets["SUPABASE_KEY"]
+                    except (KeyError, AttributeError):
+                        # Secrets not available, fall back to environment variables
+                        pass
+                
+                # Fallback to environment variables if secrets not available
+                if not supabase_url:
+                    supabase_url = os.getenv("SUPABASE_URL")
+                if not supabase_key:
+                    supabase_key = os.getenv("SUPABASE_KEY")
+                    
             except Exception:
                 # Handle case where secrets.toml doesn't exist or is malformed
                 pass
