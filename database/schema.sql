@@ -61,6 +61,29 @@ CREATE TABLE action_plans (
 -- Index for retrieving plans by chat
 CREATE INDEX idx_action_plans_chat_id ON action_plans(chat_id, created_at DESC);
 
+-- Table 5: telemetry_events
+-- Stores AI interaction telemetry data for analytics
+CREATE TABLE telemetry_events (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    chat_id UUID NOT NULL REFERENCES chat_instances(id) ON DELETE CASCADE,
+    category TEXT NOT NULL CHECK (category IN ('Lease & Contracts', 'Maintenance & Repairs', 'Tenant Communications')),
+    ai_mode TEXT NOT NULL CHECK (ai_mode IN ('💬 Chat', '✉️ Draft', '📋 Plan', '❓ Ask')),
+    latency_ms DECIMAL(10,2) NOT NULL,
+    tokens_used INTEGER NOT NULL,
+    estimated_cost_usd DECIMAL(10,6) NOT NULL,
+    model_name TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('success', 'error')),
+    error_message TEXT,
+    timestamp TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Indexes for efficient telemetry querying
+CREATE INDEX idx_telemetry_events_chat_id ON telemetry_events(chat_id, timestamp DESC);
+CREATE INDEX idx_telemetry_events_timestamp ON telemetry_events(timestamp DESC);
+CREATE INDEX idx_telemetry_events_category ON telemetry_events(category);
+CREATE INDEX idx_telemetry_events_ai_mode ON telemetry_events(ai_mode);
+CREATE INDEX idx_telemetry_events_status ON telemetry_events(status);
+
 -- Row Level Security (RLS) Policies
 -- Enable RLS for multi-user support in the future
 
@@ -69,12 +92,14 @@ ALTER TABLE chat_instances ENABLE ROW LEVEL SECURITY;
 ALTER TABLE chat_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE email_drafts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE action_plans ENABLE ROW LEVEL SECURITY;
+ALTER TABLE telemetry_events ENABLE ROW LEVEL SECURITY;
 
 -- For now, allow all operations (can be restricted per user later)
 CREATE POLICY "Allow all operations on chat_instances" ON chat_instances FOR ALL USING (true);
 CREATE POLICY "Allow all operations on chat_messages" ON chat_messages FOR ALL USING (true);
 CREATE POLICY "Allow all operations on email_drafts" ON email_drafts FOR ALL USING (true);
 CREATE POLICY "Allow all operations on action_plans" ON action_plans FOR ALL USING (true);
+CREATE POLICY "Allow all operations on telemetry_events" ON telemetry_events FOR ALL USING (true);
 
 -- Functions for updating timestamps
 CREATE OR REPLACE FUNCTION update_updated_at_column()

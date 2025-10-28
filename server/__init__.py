@@ -9,6 +9,7 @@ from .conversation_manager import ConversationManager
 from .prompts import get_contextual_prompt
 from .chat_storage import ChatStorageManager, ChatInstance
 from .supabase_client import SupabaseClient, get_supabase_client
+from .telemetry_manager import TelemetryCollector, get_telemetry_collector
 
 __all__ = [
     "get_gemini_llm",
@@ -18,4 +19,6 @@ __all__ = [
     "ChatInstance",
     "SupabaseClient",
     "get_supabase_client",
+    "TelemetryCollector",
+    "get_telemetry_collector",
 ]
