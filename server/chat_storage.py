@@ -76,11 +76,23 @@ class ChatStorageManager:
         """
         try:
             # Insert chat instance into database
-            result = self.supabase.table("chat_instances").insert({
+            # If authenticated, pass user_id; RLS will also enforce WITH CHECK
+            user_id = None
+            try:
+                if st.session_state.get("sb_session") and st.session_state["sb_session"].get("user"):
+                    user_id = st.session_state["sb_session"]["user"].get("id")
+            except Exception:
+                pass
+
+            payload = {
                 "name": name,
                 "category": category,
-                "workflow_phase": "assessment"
-            }).execute()
+                "workflow_phase": "assessment",
+            }
+            if user_id:
+                payload["user_id"] = user_id
+
+            result = self.supabase.table("chat_instances").insert(payload).execute()
 
             if not result.data:
                 raise Exception("Failed to create chat instance")

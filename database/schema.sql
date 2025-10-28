@@ -1,8 +1,8 @@
 -- PM Service Database Schema for Supabase
 -- Complete schema for chat instances, messages, email drafts, and action plans
 
--- Enable UUID extension
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+-- Enable pgcrypto for gen_random_uuid()
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- Table 1: chat_instances
 -- Stores chat conversation metadata
@@ -11,6 +11,7 @@ CREATE TABLE chat_instances (
     name TEXT NOT NULL,
     category TEXT NOT NULL CHECK (category IN ('Lease & Contracts', 'Maintenance & Repairs', 'Tenant Communications')),
     workflow_phase TEXT DEFAULT 'assessment',
+    user_id UUID REFERENCES auth.users(id),
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -18,6 +19,7 @@ CREATE TABLE chat_instances (
 -- Indexes for faster category filtering and sorting
 CREATE INDEX idx_chat_instances_category ON chat_instances(category);
 CREATE INDEX idx_chat_instances_created_at ON chat_instances(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_chat_instances_user_id ON chat_instances(user_id);
 
 -- Table 2: chat_messages
 -- Stores individual messages within chats
@@ -85,7 +87,7 @@ CREATE INDEX idx_telemetry_events_ai_mode ON telemetry_events(ai_mode);
 CREATE INDEX idx_telemetry_events_status ON telemetry_events(status);
 
 -- Row Level Security (RLS) Policies
--- Enable RLS for multi-user support in the future
+-- Enable RLS for multi-user support (strict policies)
 
 -- Enable RLS on all tables
 ALTER TABLE chat_instances ENABLE ROW LEVEL SECURITY;
@@ -94,12 +96,49 @@ ALTER TABLE email_drafts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE action_plans ENABLE ROW LEVEL SECURITY;
 ALTER TABLE telemetry_events ENABLE ROW LEVEL SECURITY;
 
--- For now, allow all operations (can be restricted per user later)
-CREATE POLICY "Allow all operations on chat_instances" ON chat_instances FOR ALL USING (true);
-CREATE POLICY "Allow all operations on chat_messages" ON chat_messages FOR ALL USING (true);
-CREATE POLICY "Allow all operations on email_drafts" ON email_drafts FOR ALL USING (true);
-CREATE POLICY "Allow all operations on action_plans" ON action_plans FOR ALL USING (true);
-CREATE POLICY "Allow all operations on telemetry_events" ON telemetry_events FOR ALL USING (true);
+-- Clean any existing policies
+DROP POLICY IF EXISTS "ci_select_phase1" ON chat_instances;
+DROP POLICY IF EXISTS "ci_modify_phase1" ON chat_instances;
+DROP POLICY IF EXISTS "ci_delete_phase1" ON chat_instances;
+DROP POLICY IF EXISTS "ci_insert" ON chat_instances;
+DROP POLICY IF EXISTS "cm_access" ON chat_messages;
+DROP POLICY IF EXISTS "ed_access" ON email_drafts;
+DROP POLICY IF EXISTS "ap_access" ON action_plans;
+DROP POLICY IF EXISTS "te_access" ON telemetry_events;
+
+-- Strict, user-owned access policies
+CREATE POLICY "ci_select" ON chat_instances FOR SELECT USING (user_id = auth.uid());
+CREATE POLICY "ci_modify" ON chat_instances FOR UPDATE USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
+CREATE POLICY "ci_delete" ON chat_instances FOR DELETE USING (user_id = auth.uid());
+CREATE POLICY "ci_insert" ON chat_instances FOR INSERT WITH CHECK (user_id = auth.uid());
+
+CREATE POLICY "cm_access" ON chat_messages
+FOR ALL USING (EXISTS (
+  SELECT 1 FROM chat_instances ci WHERE ci.id = chat_messages.chat_id AND ci.user_id = auth.uid()
+)) WITH CHECK (EXISTS (
+  SELECT 1 FROM chat_instances ci WHERE ci.id = chat_messages.chat_id AND ci.user_id = auth.uid()
+));
+
+CREATE POLICY "ed_access" ON email_drafts
+FOR ALL USING (EXISTS (
+  SELECT 1 FROM chat_instances ci WHERE ci.id = email_drafts.chat_id AND ci.user_id = auth.uid()
+)) WITH CHECK (EXISTS (
+  SELECT 1 FROM chat_instances ci WHERE ci.id = email_drafts.chat_id AND ci.user_id = auth.uid()
+));
+
+CREATE POLICY "ap_access" ON action_plans
+FOR ALL USING (EXISTS (
+  SELECT 1 FROM chat_instances ci WHERE ci.id = action_plans.chat_id AND ci.user_id = auth.uid()
+)) WITH CHECK (EXISTS (
+  SELECT 1 FROM chat_instances ci WHERE ci.id = action_plans.chat_id AND ci.user_id = auth.uid()
+));
+
+CREATE POLICY "te_access" ON telemetry_events
+FOR ALL USING (EXISTS (
+  SELECT 1 FROM chat_instances ci WHERE ci.id = telemetry_events.chat_id AND ci.user_id = auth.uid()
+)) WITH CHECK (EXISTS (
+  SELECT 1 FROM chat_instances ci WHERE ci.id = telemetry_events.chat_id AND ci.user_id = auth.uid()
+));
 
 -- Functions for updating timestamps
 CREATE OR REPLACE FUNCTION update_updated_at_column()

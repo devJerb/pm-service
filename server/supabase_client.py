@@ -75,6 +75,17 @@ class SupabaseClient:
                 )
             
             cls._instance = create_client(supabase_url, supabase_key)
+
+            # If there is an authenticated user session, bind JWT for RLS
+            try:
+                if hasattr(st, "session_state") and st.session_state.get("sb_session"):
+                    access_token = st.session_state["sb_session"].get("access_token")
+                    if access_token:
+                        # postgrest.auth ensures subsequent table() calls carry the user JWT
+                        cls._instance.postgrest.auth(access_token)
+            except Exception:
+                # If anything goes wrong, continue without binding; RLS will enforce permissions
+                pass
         
         return cls._instance
     
